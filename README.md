@@ -2,6 +2,12 @@
 # spring_study
 참여 인원 - 타미, 티거, 럿고, 우
 
+## 지각
+타미 1  
+티거 1  
+럿고 1  
+우 1
+
 ## 목표
 
 6/14까지 [스프링 부트 개념과 활용](https://www.inflearn.com/course/%EC%8A%A4%ED%94%84%EB%A7%81%EB%B6%80%ED%8A%B8/dashboard) 완강
