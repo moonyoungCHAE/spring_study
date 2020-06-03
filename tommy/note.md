@@ -1,3 +1,144 @@
+# 스프링 부트 프로젝트 생성하기
+
+1. spring initializer
+2. java project 생성 후 의존성 추가
+3. 온라인 initializer
+
+[Spring Initializr](https://start.spring.io/)
+
+# 의존성 관리 이해
+
+'io.spring.dependency-management' 가 Spring 의존성 버전 관리를 해준다.
+
+```
+plugins {
+    id 'org.springframework.boot' version '2.2.2.RELEASE'
+    **id 'io.spring.dependency-management' version '1.0.8.RELEASE'
+		// cf. maven에서는 parent**
+    id 'java'
+}
+.
+.
+.
+dependencies {
+    **implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+		// spring.dependency-management 덕분에 version을 명시하지 않고 사용할 수 있다.
+		// 이 의존성은 또 다른 라이브러리들을 추가해준다.
+}
+```
+
+1. 'io.spring.dependency-management'에는 각 의존성에 따른 버젼을 설정해두었다.
+2. 사용자는 version을 명시하지 않아도 의존성을 추가할 수 있다.
+
+    하지만 version을 명시하는 것이 좋다. (server에 배포할 때 다른 version이 사용될 수 있기 때문에)
+
+3. Spring boot에서 의존성 관리를 해주면서 개발자는 관리할 의존성이 별로 없어졌다. 
+
+---
+
+```java
+repositories {
+    mavenCentral()
+    jcenter()
+}
+```
+
+`repositories` 는 각종 의존성(라이브러리)들을 어떤 원격 저장소에서 받을지를 정합니다. 기본적으로 mavenCentral을 많이 사용하지만, 최근에는 **라이브러리 업로드 난이도** 때문에 jcenter도 많이 사용합니다.
+
+mavenCentral은 이전부터 많이 사용하는 저장소지만, 본인이 만든 라이브러리를 업로드하기 위해 많은 과정과 설정이 필요하다보니 개발자들이 직접 만든 라이브러리를 업로드하는 것이 힘들어 점점 공유가 안되는 상황이 발생했습니다.
+
+이런 문제점을 개선하여 최근에 나온 것이 jcenter입니다. 그리고 jcenter에 라이브러리를 업로드하면 mavenCentral에도 업로드될 수 있도록 자동화를 할 수 있습니다. 여기서는 mavenCentral, jcenter 둘 다 등록해서 사용하겠습니다.
+
+---
+
+## 자동 설정 이해
+
+@SpringBootApplication  = @SpringBootConfiguration + @ComponentScan + @EnableAutoConfiguration
+
+Bean은 사실 두 단계로 나눠서 읽힘
+
+- 1단계: @ComponentScan
+- 2단계: @EnableAutoConfiguration
+
+### ComponentScan
+
+1. @Component 을 scan해준다.
+
+    Component: @Configuration @Repository @Service @Controller @RestController
+
+2. Sacn 받지 않도록 설정해준 Component는 제외하고 Scan한다.
+
+```java
+@ComponentScan(excludeFilters = { @Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
+		@Filter(type = FilterType.CUSTOM, classes = AutoConfigurationExcludeFilter.class) })
+```
+
+3. ComponentScan을 시작하는 곳 하위 package만 Scan하는 것 주의할 것
+
+### EnableAutoConfiguration
+
+- @EnableAutoConfiguration에 등록된 Annotation(@XXXConfiguration)이 있다면 Bean 등록해준다.
+    - gradle 설정을 통해 EnableAutoConfiguation 라이브러리를 받았다. (external lib)
+    - 그 라이브러리의 meta file인 spring.factories에, @EnableAutoConfiguration을 통해 등록할 annotation 목록이 있다.
+    - @XXXConfiguartion 역시 @Configuration이다.
+    - 조건이 있어 조건에 따라 Bean 등록을 하게 된다.
+---
+### 내장 웹 서버 이해
+부트는 서버가 아니다.
+1. 톰캣 객체 생성
+2. 포트 설정
+3. 톰캣에 컨텍스트 추가
+4. 서블릿 만들기
+5. 톰캣에 서블릿 추가
+6. 컨텍스트에 서블릿 맵핑
+7. 톰캣 실행 및 대기
+
+이 모든 과정을 보다 상세히 또 유연하게 설정하고 실행해주는게 바로 스프링 부트의 자동 설정
+
+* ServletWebServerFactoryAutoConfiguration(서블릿 웹 서버 생성)
+    * TomcatServletWebServerFactoryCustomizer(서버 커스터마이징)
+* DispatcherServletAutoConfiguration
+    * 서블릿 만들고 등록
+---
+## HTTPS, HTTP2
+### HTTPS
+(1) Key store 생성
+```
+$ keytool -genkey -alias tomcat -storetype PKCS12 -keyalg RSA -keysize 2048 -keystore keystore.p12 -validity 4000
+application.yml
+```
+명령어 수행한 위치에 키스토어가 생성된다. 
+(2) Key 등록
+```
+[application.yml]
+server:
+ssl:
+  key-store: keystore.p12
+  key-store-type: PKCS12
+  key-store-password: 123456
+  key-alias: tomcat
+```
+이렇게 SSL 키를 등록하고 스프링부트 애플리케이션을 실행하면, localhost:8080으로 접근이 불가하다. 앞으로 애플리케이션으로의 모든 접근은 https로 해야한다.
+
+(3)
+추가적으로 http 접근도 가능하게 설정하려면 아래와 같이 애플리케이션 코드에 http 요청을 받기 위한 커넥터를 추가해주면 된다. 대신 application.yml에서 https의 포트를 변경해준다.
+
+```
+ @Bean
+   public ServletWebServerFactory serverFactory() {
+       TomcatServletWebServerFactory tomcat = new TomcatServletWebServerFactory();
+       tomcat.addAdditionalTomcatConnectors(createStandardConnector());
+       return tomcat;
+  }
+​
+   private Connector createStandardConnector() {
+       Connector connector = new Connector("org.apache.coyote.http11.Http11NioProtocol");
+       connector.setPort(8080);
+       return connector;
+  }
+```
+---
 ### 독립적으로 실행 가능한 JAR
 **의존성 packing을 통해 받은 외부 라이브러리를 통해 JAR 파일 하나로 독립적으로 실행 할 수 있다.**
 
