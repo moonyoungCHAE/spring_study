@@ -484,4 +484,214 @@ logging.path=logs
 # 원래 출력 안되던 logger.debug까지 출력된다.
 logging.level.project.AppRunner=DEBUG
 ```
+# 테스트
 
+spring-boot-start-test
+
+- test를 위한 기본
+- gradle에 추가해주기
+
+spring test에는 크게 2가지 종류가 있다.
+
+1. 통합 테스트 (실제 서버 환경에서 테스트하기)
+2. 슬라이싱 테스트 (실제 서버 환경 X에서 테스트하기)
+
+## @SpringBootTest
+
+- **실제 Spring 서버 구동 환경으로 하거나 (port 존재) / 그와 비슷한 환경 (Mock)에서 테스트한다**.
+- @RunWith(SpringRunner.class) 와 같이 써준다.
+- 실행하면 @SpringApplication 찾아간다
+    - 모든 bean 스캔한다.
+    - mock bean 설정하면 그 mock bean만 교체된다.
+    - mock bean은 테스트할 때마다 reset된다.
+### SpringBootTest  webEnvironment 1. MOCK (default)
+
+- **내장 톰캣을 구동하지 않는다.**
+    - servlet container를 띄우지 않는다.
+    - spring 환경과 ""비슷""한 상태이다. (mockup 되어있다.)
+
+    **→ MockMvc 같이 사용해준다.**
+
+```java
+@RunWith(SpringRunner.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@AutoConfigureMockMvc
+public class Test {
+
+    @Autowired
+    MockMvc mockMvc;
+
+    @org.junit.Test
+    public void name() {
+        mockMvc.perform(get("/hello"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("hello keesun"))
+                .andDo(print());
+
+    }
+}
+```
+
+### SpringBootTest  webEnvironment 2. Port 지정
+
+- **실제로 내장 톰캣이 구동된다.**
+    - Random_PORT or PORT 지정
+        - Random_PORT로 테스트하는 게 더 좋다.
+- TestRestTemplate : sync 동기
+- **WebTestClinet** : async 비동기
+    - API 테스트할 때 더 좋다. (성능상 이득)
+    - gradle에 추가해야 한다.
+
+```java
+@RunWith(SpringRunner.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureMockMvc
+public class Test {
+    @Autowired
+    TestRestTemplate restTemplate;
+
+    @MockBean
+    SampleService sampleService;
+    
+    @Test
+    public void name() {
+        String result = restTemplate.getForObject("/hello", String.class);
+    }
+}
+```
+
+## Slice Test
+
+실제 Spring 환경이 아닌, 원하는 Component만 사용하고 싶을 때
+
+### **@JsonTest**
+
+- `@JsonTest`는 JSON의 직렬화, 역직렬화를 수행하는 라이브러인 Gson과 Jackson의 테스트를 제공합니다.
+
+```
+@RunWith(SpringRunner.class)
+@JsonTest
+public class BookJsonTest {
+
+    @Autowired
+    private JacksonTester<Book> json;
+
+    @Test
+    public void json_test() throws IOException {
+
+        final Book book = new Book("title", 1000D);
+
+        String content= "{\n" +
+                "  \"id\": 0,\n" +
+                "  \"title\": \"title\",\n" +
+                "  \"price\": 1000\n" +
+                "}";
+
+        assertThat(json.parseObject(content).getTitle()).isEqualTo(book.getTitle());
+
+        assertThat(json.write(book)).isEqualToJson("/test.json");
+    }
+}
+```
+
+### @WebMVCTest
+
+**Client Test에 적합하다**.
+
+web과 관련된 component만 등록된다.
+
+### @OutputCapture
+
+log 메세지에 찍히는 것으로 테스트할 수 있다.
+
+---
+
+**SpringDevTool 설정하면 Reload할 수 있다.**
+
+### Restart vs Reload
+
+써드 파티 안의 jar 파일은 base classloader로 읽어들이고, 사용자가 만드는 클래스는 restart classloader로 읽어들입니다. 이러한 접근은 재시작이 _cold start(완전히 껏다가 다시 켜는 것)_보다 훨씬 빨리 일어나게 도와줍니다.
+
+아직 재시작(restart)가 느리게 느껴진다면, JRebel 같은 reloading 기술을 이용할 수도 있습니다. JRebel은 릴로딩이 편하도록 클래스를 다시 만듭니다.
+
+---
+
+# Spring Web MVC
+
+WebMVC (Test) 자동설정이 있다. 
+
+**SpringBoot MVC : 자동설정**을 제공한다.
+
+**Spring MVC 프레임워크**는 디커플된 웹 애플리케이션 개발 방법을 제공한다. Dispatcher Servlet, ModelAndView, View Resolver 과 같은 단순개념을 이용해서 웹 애플리케이션 개발을 쉽게 할 수 있도록 해준다.
+
+**[출처]** [Spring Boot vs. Spring MVC vs. Spring 의 비교](http://blog.naver.com/sthwin/221271008423)|**작성자** [멋진태혁](http://blog.naver.com/sthwin)
+
+Spring MVC 확장: @Configuration + @WebMVC Configurer
+
+Spring MVC 재정의: @Configuration + @EnableWebMvc
+
+## HttpMessgaeConvertors
+
+Http 요청 ( Request/Response Body ) ↔ Object
+
+```java
+@PostMapping("/user")
+public @ResponseBody User create
+```
+
+## VeiwResolver
+
+Request Accetp Header에 따라 결과가 달라진다.
+
+1. 모든 view type에 따른 결과를 만든다. (by. HttpMessageConvertor)
+    - json, xml 등 format
+        - (만약 convertor에서 해당 type을 지원하지 않는다면 gradle에 추가해줄 것)
+    - view: jsp, html 같은 타입?? 아니면 json, xml 같은 타입?? 헷갈림!
+2. accept header에 맞는 결과를 돌려준다. (by. ViewResolver)
+
+ViewResolver가 Convertor에 특정 type으로 만들라고 시킨다 ??
+
+### 정적 리소스
+
+[localhost:8080/me.html](http://localhost:8080/me.html) → static resoure file
+
+서버에서 어떤 작업을 한 후 데이터를 제공하는 게 아니라 원래 있던 데이터를 제공하는 것
+
+- 기본 리소스 위치가 있고 변경할 수도 있다.
+
+- 브라우저: 자기가 받은 리소스 last modified 있음, 받으려는 파일의 last modified와 비교해서 변화가 있다면 다시 받고 아니라면 원래 있던 리소스를 재사용한다. (=304 응답)
+- ResourceHttpRequestHandler가 처리한다.
+    - Handler: 어떤 요청이 왔을 때 처리를 지정한다.
+        - [localhost:8080/me.html](http://localhost:8080/me.html) → static resoure file **(기본)**
+        - **/m/something에 대한 요청을 처리를 추가할 수 있다.**
+
+    ```java
+    @Configuration
+    public class WebConfig implements WebMvcConfigurer {
+        @Override
+        public void addResourceHandlers(ResourceHandlerRegistry registry) {
+            registry.addResourceHandler("/m/**")
+                    .addResourceLocations("classpath:/m/")
+                    .setCachePeriod(20);
+        }
+    }
+    ```
+
+### 웹 JAR
+
+[https://velog.io/@jayjay28/웹-JAR](https://velog.io/@jayjay28/%EC%9B%B9-JAR)
+
+**Client 측에서 사용하는 웹 JAR (ex. jQuery)를 Server Gradle에 추가해서 사용할 수 있다 !!**
+
+```java
+[Gradle]
+implementation (group: 'org.webjars.bower', name: 'jquery', version: '3.3.1')
+
+[html]
+<script src="/webjars/jquery/3.3.1/dist/jquery.min.js"></script>
+<script>
+    $(function() {
+        alert("ready!");
+    })
+</script>
+```
