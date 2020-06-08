@@ -695,3 +695,204 @@ implementation (group: 'org.webjars.bower', name: 'jquery', version: '3.3.1')
     })
 </script>
 ```
+
+템플릿 엔진: 주로 view를 만들 때 사용 (항상 X, 다른 것도 할 수 있다.)
+
+- Spring에 의존성을 추가해주어야 한다.
+- 동적 컨텐츠를 보여줄 때 의미가 있다.
+
+JSP : 권장 X
+
+- WAR 패키징 해야 된다.
+- JAR 패키징 X
+- Servlet 엔진 중에 WAR 지원하지 않는 것도 있어서 가급적 사용하지 않는 게 좋다.
+
+## Thymeleaf
+
+- 스프링 부트가 자동 설정을 지원하는 템플릿 엔진 中 1
+- 템플릿 엔저니 ~ thymeleaf 를 사용하면 view rendering이 어떻게 되는지 알 수 있다.
+- body에 <html> ... <.html> 어떻게 rendering되는지 나온다.
+    - HTML Unit를 사용해서 rendering된 값을 테스트할 수 있다.
+
+```java
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"> // thymleaf를 사용한다.
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h1 th:text="${name}">name</h1>
+// * model에 name value가 넘어오면 그 value
+// *  아니면 "name"이 나온다.
+</body>
+</html>
+```
+
+---
+
+SpringBoot Test할 때 테스트 코드의 Package과 프로덕션 코드의 Package 경로를 고려해야 한다.
+
+[java.lang.IllegalStateException: Unable to find a @SpringBootConfiguration, you need to use @ContextConfiguration or @SpringBootTest(classes=...) with your test](https://parkcheolu.tistory.com/125)
+
+```java
+
+/*
+ test code의 package: java
+ production class의 package: java/production
+ --> 에러!
+*/
+@RunWith(SpringRunner.class)
+@WebMvcTest(SampleController.class)
+public class Test {
+    @Test
+    public void test() {
+			// do test
+    }
+}
+```
+## HtmlUnit
+
+- html 파일을 테스트하는 도구
+    - html 파일의 element를 확인할 수 있다.
+- webClient 만들어서 사용
+
+xpaht: xml 테스트
+
+- html도 xml 중 하나라서
+- html의 elemetn를 확인할 수 있다.
+- ex. h1의 값 확인
+
+```java
+@RunWith(SpringRunner.class)
+@WebMvcTest(SampleController.class)
+public class Test2 {
+    @Autowired
+    WebClient webClient;
+
+    @org.junit.Test
+    public void name() throws IOException {
+        HtmlPage page = webClient.getPage("/hello");
+        HtmlHeading1 h1 = page.getFirstByXPath("//h1");
+        assertThat(h1.getTextContent()).isEqualTo("tommy");
+    }
+}
+```
+
+## ExceptionHandler
+
+실제 Error를 관리하는 곳 : ErrorController
+
+### Error Status Code에 따른 에러 페이지 만들기
+
+resources에 error status code를 이름으로 갖는 페이지를 만든다.
+
+ex. 404.html, 4xx.html
+
+**ErrorViewResolver**: 좀 더 동적인 에러 페이즈를 만들 수 있다.
+
+## HATEOAS
+
+- 의존성만 넣으면 사용할 수 있다.
+- Rource와 연관있는 링크 정보 (url)을 알려준다.
+- self (내가 요청한 페이지)
+- 관련 링크를 보내주는 Resource를 만들고, 걔를 return 해준다.
+
+```java
+@GetMapping("/hello")
+    public Resource<Hello>  hello() {
+        Hello hello = new Hello();
+        hello.setPrefix("Hey, ");
+        hello.setName("Tommy");
+
+        Resource<Hello> helloResource = new Resource<>(hello);
+        helloResource.add(linkTo(methodOn(SampleController.class).hello()).withSelfRel());
+        return helloResource;
+    }
+
+MockHttpServletResponse:
+             Body = {"prefix":"Hey, ","name":"Tommy","_links":{"self":{"href":"http://localhost/hello"}}}
+```
+Object Mapper도 Custom해서 사용할 수 있다.
+
+application.properties에 원하는 Object Mapper를 등록해준다.
+
+## CORS
+
+Origin: URI 스키마 (http/https)  + hostname (localhos) + 포트 (8080)
+
+Single Origin Policy : Origin끼리 교환이 안된다.
+
+8080 port를 사용하는 Client 프로젝트에서 4040 prot를 사용하는 프로젝트에  접근한다. → 안된다.
+
+우회하는 게 CORS
+
+Cross-Origin Resource Sharing: Origin 끼리 교환이 된다.
+
+```java
+@CrossOrigin(origins = "https://locathost:8080)
+@GetMapping("/hello")
+public String hello() {
+	return hello;
+}
+
+// 8080 Client Application에서 4040 port를 사용하는 프로젝트에 접근할 수 있다. 
+```
+
+- 메서드에 CrossOrigin 설정을 할 수 있다.
+- Controller에 CrossOrigin 설정을 할 수 있다.
+- 프로젝트 자체에 CrossOrigin 설정을 할 수 있다.
+
+```java
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+	@Override
+	public void addCorsMapping(CorsRegistry registry) {
+		registry.addMapping("/hello")
+						.allowedOrigins("https://localhost:8080");
+	}
+}
+```
+
+---
+
+## Spring in memory Database
+
+(예) H2, HSQL
+
+의존성 추가하면 자동적으로 인메모리 데이터베이스가 생긴다.
+
+properties에 h2 console 허용해주고 console을 볼 수 있다.
+
+## DBCP
+
+Database에 connection하는 것 귀찮다!
+
+→ connection pool : 미리 connection을 만들어놓고, 가져다 쓴다.
+
+- 여러가지 설정을 할 수 있다.
+    - autocommit
+    - connectionTimeout
+    - poolSize
+        - 동시에 실행 가능한 connection 개수 정해져 있다.
+        - poolSize가 크다고 마냥 좋은 건 아니다.
+- **성능에 유의미하다. → 잘 만들어야 한다.**
+
+DBCP
+
+ex. HikariCP (default : 별도의 설정 안해도 사용하고 있음) , Tomcat CP, Commons DBCP2
+
+[NAVER D2](https://d2.naver.com/helloworld/5102792)
+
+mysql connector 의존성을 추가하여, mySql을 사용할 수 있다. 
+
+properties에 사용할 database 정보를 써놓는다.
+
+spring.datasource.url = jdbc:mysq://localhost:3306/springboot
+
+[spring.datasource.username](http://spring.datasource.name) = tommy
+
+spring.datasource.password = password
+
+→ 위 database를 사용할 것이고, username과 password는 다음과 같다.
+
