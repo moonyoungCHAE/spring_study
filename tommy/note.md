@@ -793,10 +793,22 @@ ex. 404.html, 4xx.html
 
 ## HATEOAS
 
+- REST 조건 3단계에 해당한다.
+- 내가 요청한 **Rource와 연관있는 링크 정보 (url)을 알려준다.**
+    - 내가 요청한 Resource에서 실행 가능한 링크 정보를 알려준다.
+        - (예) 요청 결과: 잔고 30000원 → 입금, 출금 url
+        - 요청 결과: 잔고 0원 → 입금 url
+    - Client측에서는 그 링크로 요청할 수 있다.
+    - 효과
+        - Client가 Resource에 대한 상태를 알게 된다.
+        - 즉  Client측에서 Server에 요청할 때, 될지 안될지 모르는 상태가 아니라 실행 가능한 상태라는 것을 확신한 상태에서 요청하게 된다.
+        - Server측에서 Url을 바꿨을 때, Client측에서도 수정할 필요가 없다.
+            - Client: Server에서 보내준 HATEOAS 실행 가능한 url로 접근하기 때문에!
+
 - 의존성만 넣으면 사용할 수 있다.
-- Rource와 연관있는 링크 정보 (url)을 알려준다.
 - self (내가 요청한 페이지)
-- 관련 링크를 보내주는 Resource를 만들고, 걔를 return 해준다.
+- **개발자가 관련 링크를 추가해준다**
+    - 관련 링크를 보내주는 Resource를 만들고, 걔를 return 해준다.
 
 ```java
 @GetMapping("/hello")
@@ -813,24 +825,33 @@ ex. 404.html, 4xx.html
 MockHttpServletResponse:
              Body = {"prefix":"Hey, ","name":"Tommy","_links":{"self":{"href":"http://localhost/hello"}}}
 ```
+
+[RESTful, Stateless, HATEOAS 그리고 Passport](https://anster.tistory.com/163)
+
+---
+
 Object Mapper도 Custom해서 사용할 수 있다.
 
 application.properties에 원하는 Object Mapper를 등록해준다.
 
+---
+
 ## CORS
 
-Origin: URI 스키마 (http/https)  + hostname (localhos) + 포트 (8080)
+**Origin**: URI 스키마 — (http/https)  + hostname (localhos) + 포트 (8080)
 
-Single Origin Policy : Origin끼리 교환이 안된다.
+SOP **Single Origin Policy : Origin끼리 교환이 안 된다는 원칙**
 
-8080 port를 사용하는 Client 프로젝트에서 4040 prot를 사용하는 프로젝트에  접근한다. → 안된다.
+- 8080 port를 사용하는 Client 프로젝트에서 4040 port를 사용하는 프로젝트에  접근한다.
 
-우회하는 게 CORS
+    → 안된다.
 
-Cross-Origin Resource Sharing: Origin 끼리 교환이 된다.
+- 해결 방법: 브라우저에서 JSONP 사용 - 서버에서 CORS
+
+**Cross-Origin Resource Sharing: Origin 끼리 교환이 된다.**
 
 ```java
-@CrossOrigin(origins = "https://locathost:8080)
+@CrossOrigin(origins = "https://locathost:8080")
 @GetMapping("/hello")
 public String hello() {
 	return hello;
@@ -856,7 +877,7 @@ public class WebConfig implements WebMvcConfigurer {
 
 ---
 
-## Spring in memory Database
+## Spring in-memory Database
 
 (예) H2, HSQL
 
@@ -864,27 +885,50 @@ public class WebConfig implements WebMvcConfigurer {
 
 properties에 h2 console 허용해주고 console을 볼 수 있다.
 
+## JDBC
+
+Java DataBase Connectivity
+
+- 종류에 상관없이 Database와 연결하기 위한 API
+    - 실제 Database와 연결해주는 것은 JDBC Driver
+1. Driver를 Load한다.
+2. Database를 연결한다. Connection 
+    - `Driver.getConnection()`  Driver가 Connection을 만든다.
+3. SQL문을 실행한다.
+4. Database 연결을 종료한다.
+
+## Spring JDBC
+
+→ JDBC를 사용할 때 Driver Load 및 Database Connection 입력없이 사용하는 방식
+
+1. ~~Driver를 Load한다.~~
+2. ~~Database를 연결한다. Connection. (Driver.getConnection())~~
+3. SQL문을 실행한다. → 얘만 작성할 수 있게 하는 방법
+4. ~~Database 연결을 종료한다.~~
+
+(예) JDBC Template
+
 ## DBCP
 
-Database에 connection하는 것 귀찮다!
+DataBase Connection Pool
 
-→ connection pool : 미리 connection을 만들어놓고, 가져다 쓴다.
+Database Connection 비용 크다 → connection pool : 미리 connection을 만들어 놓고, 가져다 쓴다.
 
-- 여러가지 설정을 할 수 있다.
-    - autocommit
-    - connectionTimeout
-    - poolSize
-        - 동시에 실행 가능한 connection 개수 정해져 있다.
-        - poolSize가 크다고 마냥 좋은 건 아니다.
-- **성능에 유의미하다. → 잘 만들어야 한다.**
+- Connection by. WAS
+- Database 관련 정보는
+- 성능에 유의미하기 때문에 여러가지 설정을 잘 해야 한다.
 
-DBCP
+## Data Source
 
-ex. HikariCP (default : 별도의 설정 안해도 사용하고 있음) , Tomcat CP, Commons DBCP2
+- interface
+- connection 생성 / 반납에 대해 정의하고 있다.
 
-[NAVER D2](https://d2.naver.com/helloworld/5102792)
+DataSource라는 객체는 **Connection Pool을 관리**하는 목적으로 사용되는 객체
+Application에서 이 DataSource 객체를 통해 **Connection을 얻어오고 반납하는 작업**을 할 수 있다.
 
 mysql connector 의존성을 추가하여, mySql을 사용할 수 있다. 
+
+---
 
 properties에 사용할 database 정보를 써놓는다.
 
@@ -896,3 +940,101 @@ spring.datasource.password = password
 
 → 위 database를 사용할 것이고, username과 password는 다음과 같다.
 
+---
+
+# ORM
+
+ORM : 객체와 릴레이션을 mapping할 때 개념적 불일치를 해결하는 프레임워크
+
+개념적 불일치
+
+1. **상속**
+- 객체는 상속 可
+- Table은 상속 不可
+
+2. **식별자**
+
+- 객체의 identity: hashcode 또는 equals
+- Table의 identity: id
+
+상속 관계 : Spring Data JPA → JPA → Hibernate → Datasource
+
+### Spring Data JPA
+
+- 의존성 추가 해주기
+
+implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+의존성 추가하고 따로 db추가하는 것 ??
+
+`@DataJpaTest` : 테스트용으로 in-memory 데이터 베이스를 사용할 수 있다.
+
+`@SpringBootTest`: Server Database가 바뀐다. → 인수테스트
+
+**test code와 production code 다른 Database를 가지는 게 좋다.**
+
+@SpringBootTest(properties overriding 가능)
+
+```java
+// 슬라이싱 테스트:  repository와 관련된 것만 테스트
+@RunWith(SpringRunner.class)
+@DataJpaTest // == 슬라이싱 테스트, in-memery가 반드시 필요하다.
+public class AccountRepositoryTest {
+    @Autowired
+    DataSource dataSource;
+```
+
+```java
+public interface AccountRepository extends JpaRepository<Account, Long> {
+   Account findByUsername(String username);
+   Optional<Account> findByUsername(String username); // Optional return도 可
+}
+
+* Account의 멤버변수로 Username 알아서 처리된다.
+```
+
+application.properties
+
+[Spring에서 JPA / Hibernate 초기화 전략](https://pravusid.kr/java/2018/10/10/spring-database-initialization.html)
+
+DDL(Data Definition Language)
+
+- Create, Alter, Drop, Truncate
+
+`spring.jpa.hibernate.ddl-auto`
+
+→ Entity를 보고 스키마를 자동으로 만들어준다.
+
+`spring.jpa.hibernate.ddl-auto=update` [옵션]
+
+- 기존 데이터 유지, 바뀐 스카마 추가된다.
+- 내가 String name → nickname 하면 name 있는 상태에서 nickname이 추가된다.
+
+`spring.jpa.hibernate.ddl-auto=validate`
+
+- entity를 보고 스키마를 만들어주지 않는다.
+- 이미 스키마가 존재하는 상태에서 relation mapping이 되는지 검증해준다.
+
+schema.sql → data.sql 순서로 실행된다.
+
+- data platform에 맞는 schema, data.sql 사용할 수 있다.
+- property에 platform 추가 해주어야 한다.
+
+`spring.jpa.show-sql=true`
+
+사용되는 sql 보인다.
+
+## Data Imgration
+
+### Flyway
+
+data도 version 관리할 수 있는 툴
+
+- Version 관리를 알아서 해주는 게 아니라 **내가 Version에 해당하는 sql을 만들어준다.** 해당 sql 을 실행한다.
+    - table이나 초기 데이터 설정을 해준다.
+- 의존성 추가
+- resource/db/migration — V1__이름.sql , V2__이름.sql
+    - 위 package에 version에 해당하는 sql을 직접 작성해준다.
+    - **V1 실행, V2 ... 마지막 Version SQL 실행된다.** (마지막 Version만 실행 X)
+    - 이미 실행했다면 해당 sql 절대로 건드리면 안된다. 새로 Version으로 sql을 만든다.
+- table에 version 관리를 하는 flyway table이 생긴다.
