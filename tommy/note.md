@@ -1038,3 +1038,102 @@ data도 version 관리할 수 있는 툴
     - **V1 실행, V2 ... 마지막 Version SQL 실행된다.** (마지막 Version만 실행 X)
     - 이미 실행했다면 해당 sql 절대로 건드리면 안된다. 새로 Version으로 sql을 만든다.
 - table에 version 관리를 하는 flyway table이 생긴다.
+
+# Spring Security
+
+spring security 설정하면 **모든 request에 대해 인증을 요청**한다.
+
+- 모든 요청을 가로채서 인증을 요구함
+- (Spring Boot) Application 용 Uer를 생성하여, in-memory로 저장한다. — name, password
+    - at UserDetailsService
+    - 이 User 정보로 로그인할 수 있다.
+    - 원래 Application 만들 때 이런 Uer 만들어주어야 한다.
+
+**Accept Header에 따라 요구하는 인증의 형태가 달라진다.**
+
+- 설정 x : Basic - 401 error
+- text/html — form : Basic - 301 error
+    - 3xx redirection으로 spring이 제공하는 로그인 페이지로 이동한다.
+
+---
+
+testImplementation 'org.springframework.security:spring-security-test'
+
+@WithMockUser
+
+→ Security 설정 된 상태에서 User Mock 처리 후 테스트 가능
+
+---
+
+로직 처리 없이 url - page rendering mapping
+
+```java
+		@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addViewController("/hello").setViewName("hello");
+    }
+}
+```
+
+---
+
+```java
+@Configuration
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.authorizeRequests()
+                // if anyMatchers "/a". "/b" -- 해당 url에 match 되는 것은 permit
+                .antMatchers("/", "/hello").permitAll()
+                // else authenticated이 필요하고, login이 필요하다.
+                .anyRequest().authenticated()
+                .and()
+                .formLogin()
+                .and()
+                .httpBasic();
+
+    }
+}
+```
+
+---
+
+- Spring Security에서의 User username, password가 있는데
+- **password 저장할 때는 Encoding 처리해주어야 한다.**
+- Encoding된 것은 Server에서 처리이고, 실제 사용자는 원래의 PW로 사용한다.
+
+---
+
+### RestTemplate, WebClient
+
+RestTemplateBuilder. WebClientBuilder를 Bean으로 등록해서 사용한다.
+
+- RestTemplate
+    - 동기
+- WebClient
+    - 비동기
+- global customize하면 전역적으로 customizing된 WebClientBuilder를 사용할 수 있다.
+- WebClient 자체를 전역 Bean으로 등록할 수 도 있다.
+
+---
+
+# Spring Actuator
+
+spring boot actuator는 한 마디로 얘기하면 "**스프링 부트 애플리케이션**에서 제공하는 여러가지 정보(end point) 를 **모니터링**하기 쉽게 해주는 기능"이다.
+
+다른 애플리케이션으로 접근할 때에 사용할 수 있다. (CORS)
+
+- 여러가지 정보가 있는데 properties에서 공개 설정을 해준다.
+    - api처럼 [localhost:8080/actuator/info](http://localhost:8080/actuator/info)  이런 식으로 접근하게 된다.
+        - HTTP 접근할 거라면, 스프링 security로 보안해둘 것
+    - 또는 jconsole 프로그램으로 접근할 수도 있다
+
+@EnableAdminServer
+
+- Client 애플리케이션에 대한 AdminServer를 설정할 수 있다.
+    - AdminServer는 또 다른 애플리케이션이다.
+- Client 애플리케이션 정보를 properties에 적어놓으면 Client 애플리케이션 정보를 편하게 볼 수 있다.
+- AdminServer에도 Security 정할 것
